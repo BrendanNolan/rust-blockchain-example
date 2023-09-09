@@ -106,14 +106,14 @@ fn try_accept_chain(app_behaviour: &mut AppBehaviour, resp: ChainResponse, sourc
             .into();
 }
 
-fn try_send_local_chain(app_behaviour: &mut AppBehaviour, req: ChainRequest, source: &PeerId) {
+fn try_send_local_chain(app_behaviour: &mut AppBehaviour, req: ChainRequest, target: &PeerId) {
     if !req.from_peer_id.equal(&PEER_ID) {
         return;
     }
-    info!("sending local chain to {}", source.to_string());
+    info!("sending local chain to {}", target.to_string());
     let response = ChainResponse {
         blocks: app_behaviour.blockchain.blocks.clone(),
-        receiver: SerializablePeerId(source.to_string()),
+        receiver: SerializablePeerId(target.to_string()),
     };
     if let Err(e) = app_behaviour.response_sender.send(response) {
         error!("error sending response via channel, {}", e);
@@ -136,13 +136,13 @@ fn try_add_new_block(app_behaviour: &mut AppBehaviour, block: Block, source: &Pe
 impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
     fn inject_event(&mut self, event: MdnsEvent) {
         match event {
-            MdnsEvent::Discovered(discovered_list) => {
-                for (peer, _addr) in discovered_list {
+            MdnsEvent::Discovered(discovered_addresses) => {
+                for (peer, _addr) in discovered_addresses {
                     self.floodsub.add_node_to_partial_view(peer);
                 }
             }
-            MdnsEvent::Expired(expired_list) => {
-                for (peer, _addr) in expired_list {
+            MdnsEvent::Expired(expired_addresses) => {
+                for (peer, _addr) in expired_addresses {
                     if !self.mdns.has_node(&peer) {
                         self.floodsub.remove_node_from_partial_view(&peer);
                     }
