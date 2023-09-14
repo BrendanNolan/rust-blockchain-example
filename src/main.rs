@@ -71,7 +71,7 @@ async fn main() {
                 line = stdin.next_line() => Some(p2p::EventType::Input(
                     line.expect("can get line").expect("can read line from stdin"))),
                 response = response_rcv.recv() => {
-                    Some(p2p::EventType::LocalChainResponse(response.expect("response exists")))
+                    Some(p2p::EventType::ChainResponse(response.expect("response exists")))
                 },
                 _ = init_rcv.recv() => {
                     Some(p2p::EventType::Init)
@@ -97,7 +97,7 @@ async fn main() {
                     request_chain(&mut swarm, last_peer.clone());
                 }
             }
-            p2p::EventType::LocalChainResponse(resp) => {
+            p2p::EventType::ChainResponse(resp) => {
                 let json = serde_json::to_string(&resp).expect("can jsonify response");
                 swarm
                     .behaviour_mut()

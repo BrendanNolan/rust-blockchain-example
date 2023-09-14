@@ -41,7 +41,7 @@ pub struct ChainRequest {
 }
 
 pub enum EventType {
-    LocalChainResponse(ChainResponse),
+    ChainResponse(ChainResponse),
     Input(String),
     Init,
 }
