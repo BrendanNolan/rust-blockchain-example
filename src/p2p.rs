@@ -197,11 +197,11 @@ pub fn handle_create_block(cmd: &str, swarm: &mut Swarm<AppBehaviour>) {
         latest_block.hash.clone(),
         data.to_owned(),
     );
-    let json =
+    let json_block =
         serde_json::to_string(&Publication::Block(block.clone())).expect("can jsonify request");
     behaviour.blockchain.blocks.push(block);
     info!("broadcasting new block");
     behaviour
         .floodsub
-        .publish(BLOCK_TOPIC.clone(), json.as_bytes());
+        .publish(BLOCK_TOPIC.clone(), json_block.as_bytes());
 }

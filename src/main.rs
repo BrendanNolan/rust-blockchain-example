@@ -98,12 +98,12 @@ async fn main() {
                 }
             }
             p2p::EventType::ChainResponse(resp) => {
-                let json = serde_json::to_string(&Publication::ChainResponse(resp))
+                let json_resp = serde_json::to_string(&Publication::ChainResponse(resp))
                     .expect("can jsonify response");
                 swarm
                     .behaviour_mut()
                     .floodsub
-                    .publish(p2p::CHAIN_TOPIC.clone(), json.as_bytes());
+                    .publish(p2p::CHAIN_TOPIC.clone(), json_resp.as_bytes());
             }
             p2p::EventType::Input(line) => match line.as_str() {
                 "ls p" => p2p::handle_print_peers(&swarm),
@@ -117,9 +117,10 @@ async fn main() {
 
 fn request_chain(swarm: &mut Swarm<p2p::AppBehaviour>, peer: SerializablePeerId) {
     let req = p2p::ChainRequest { from_peer_id: peer };
-    let json = serde_json::to_string(&Publication::ChainRequest(req)).expect("can jsonify request");
+    let json_req =
+        serde_json::to_string(&Publication::ChainRequest(req)).expect("can jsonify request");
     swarm
         .behaviour_mut()
         .floodsub
-        .publish(p2p::CHAIN_TOPIC.clone(), json.as_bytes());
+        .publish(p2p::CHAIN_TOPIC.clone(), json_req.as_bytes());
 }
