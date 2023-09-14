@@ -152,7 +152,7 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
     }
 }
 
-pub fn get_list_peers(swarm: &Swarm<AppBehaviour>) -> Vec<SerializablePeerId> {
+pub fn get_peers(swarm: &Swarm<AppBehaviour>) -> Vec<SerializablePeerId> {
     info!("Discovered Peers:");
     let nodes = swarm.behaviour().mdns.discovered_nodes();
     nodes
@@ -163,7 +163,7 @@ pub fn get_list_peers(swarm: &Swarm<AppBehaviour>) -> Vec<SerializablePeerId> {
 }
 
 pub fn handle_print_peers(swarm: &Swarm<AppBehaviour>) {
-    let peers = get_list_peers(swarm);
+    let peers = get_peers(swarm);
     peers.iter().for_each(|p| info!("{}", p.0));
 }
 

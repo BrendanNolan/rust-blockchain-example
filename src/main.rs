@@ -86,7 +86,7 @@ async fn main() {
         };
         match event {
             p2p::EventType::Init => {
-                let peers = p2p::get_list_peers(&swarm);
+                let peers = p2p::get_peers(&swarm);
                 swarm.behaviour_mut().blockchain.genesis();
 
                 info!("connected nodes: {}", peers.len());
