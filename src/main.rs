@@ -9,7 +9,7 @@ use libp2p::{
     Transport,
 };
 use log::{error, info};
-use p2p::SerializablePeerId;
+use p2p::{Publication, SerializablePeerId};
 use std::time::Duration;
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
@@ -98,7 +98,8 @@ async fn main() {
                 }
             }
             p2p::EventType::ChainResponse(resp) => {
-                let json = serde_json::to_string(&resp).expect("can jsonify response");
+                let json = serde_json::to_string(&Publication::ChainResponse(resp))
+                    .expect("can jsonify response");
                 swarm
                     .behaviour_mut()
                     .floodsub
@@ -116,7 +117,7 @@ async fn main() {
 
 fn request_chain(swarm: &mut Swarm<p2p::AppBehaviour>, peer: SerializablePeerId) {
     let req = p2p::ChainRequest { from_peer_id: peer };
-    let json = serde_json::to_string(&req).expect("can jsonify request");
+    let json = serde_json::to_string(&Publication::ChainRequest(req)).expect("can jsonify request");
     swarm
         .behaviour_mut()
         .floodsub

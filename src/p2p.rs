@@ -79,17 +79,25 @@ impl AppBehaviour {
     }
 }
 
+#[derive(Serialize, Deserialize)]
+pub enum Publication {
+    ChainRequest(ChainRequest),
+    ChainResponse(ChainResponse),
+    Block(Block),
+}
+
 impl NetworkBehaviourEventProcess<FloodsubEvent> for AppBehaviour {
     fn inject_event(&mut self, event: FloodsubEvent) {
         let FloodsubEvent::Message(msg) = event else {
             return;
         };
-        if let Ok(resp) = serde_json::from_slice::<ChainResponse>(&msg.data) {
-            try_accept_chain(self, resp, &msg.source);
-        } else if let Ok(req) = serde_json::from_slice::<ChainRequest>(&msg.data) {
-            try_send_chain(self, req, &msg.source);
-        } else if let Ok(block) = serde_json::from_slice::<Block>(&msg.data) {
-            try_add_new_block(self, block, &msg.source);
+        let Ok(publication) = serde_json::from_slice::<Publication>(&msg.data) else {
+            return;
+        };
+        match publication {
+            Publication::ChainRequest(req) => try_send_chain(self, req, &msg.source),
+            Publication::ChainResponse(resp) => try_accept_chain(self, resp, &msg.source),
+            Publication::Block(block) => try_add_new_block(self, block, &msg.source),
         }
     }
 }
@@ -189,7 +197,8 @@ pub fn handle_create_block(cmd: &str, swarm: &mut Swarm<AppBehaviour>) {
         latest_block.hash.clone(),
         data.to_owned(),
     );
-    let json = serde_json::to_string(&block).expect("can jsonify request");
+    let json =
+        serde_json::to_string(&Publication::Block(block.clone())).expect("can jsonify request");
     behaviour.blockchain.blocks.push(block);
     info!("broadcasting new block");
     behaviour
