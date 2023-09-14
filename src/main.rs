@@ -68,7 +68,8 @@ async fn main() {
     loop {
         let evt = {
             select! {
-                line = stdin.next_line() => Some(p2p::EventType::Input(line.expect("can get line").expect("can read line from stdin"))),
+                line = stdin.next_line() => Some(p2p::EventType::Input(
+                    line.expect("can get line").expect("can read line from stdin"))),
                 response = response_rcv.recv() => {
                     Some(p2p::EventType::LocalChainResponse(response.expect("response exists")))
                 },
