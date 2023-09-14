@@ -87,7 +87,7 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for AppBehaviour {
         if let Ok(resp) = serde_json::from_slice::<ChainResponse>(&msg.data) {
             try_accept_chain(self, resp, &msg.source);
         } else if let Ok(req) = serde_json::from_slice::<ChainRequest>(&msg.data) {
-            try_send_local_chain(self, req, &msg.source);
+            try_send_chain(self, req, &msg.source);
         } else if let Ok(block) = serde_json::from_slice::<Block>(&msg.data) {
             try_add_new_block(self, block, &msg.source);
         }
@@ -106,7 +106,7 @@ fn try_accept_chain(app_behaviour: &mut AppBehaviour, resp: ChainResponse, sourc
             .into();
 }
 
-fn try_send_local_chain(app_behaviour: &mut AppBehaviour, req: ChainRequest, target: &PeerId) {
+fn try_send_chain(app_behaviour: &mut AppBehaviour, req: ChainRequest, target: &PeerId) {
     if !req.from_peer_id.equal(&PEER_ID) {
         return;
     }
