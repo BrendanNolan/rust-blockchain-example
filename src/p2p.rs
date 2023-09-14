@@ -166,30 +166,6 @@ pub fn print_chain(swarm: &Swarm<AppBehaviour>) {
     info!("{}", pretty_json);
 }
 
-pub fn mine_block(cmd: &str, swarm: &mut Swarm<AppBehaviour>) {
-    let Some(data) = cmd.strip_prefix("create b") else {
-        return;
-    };
-    let behaviour = swarm.behaviour_mut();
-    let latest_block = behaviour
-        .blockchain
-        .blocks
-        .last()
-        .expect("there is at least one block");
-    let block = Block::mine(
-        latest_block.id + 1,
-        latest_block.hash.clone(),
-        data.to_owned(),
-    );
-    let json_block =
-        serde_json::to_string(&Publication::Block(block.clone())).expect("can jsonify request");
-    behaviour.blockchain.blocks.push(block);
-    info!("broadcasting new block");
-    behaviour
-        .floodsub
-        .publish(BLOCK_TOPIC.clone(), json_block.as_bytes());
-}
-
 pub fn request_chain(swarm: &mut Swarm<AppBehaviour>, peer: SerializablePeerId) {
     let req = ChainRequest { from_peer_id: peer };
     let json_req =
@@ -198,4 +174,14 @@ pub fn request_chain(swarm: &mut Swarm<AppBehaviour>, peer: SerializablePeerId) 
         .behaviour_mut()
         .floodsub
         .publish(CHAIN_TOPIC.clone(), json_req.as_bytes());
+}
+
+pub fn send_block(block: Block, swarm: &mut Swarm<AppBehaviour>) {
+    let behaviour = swarm.behaviour_mut();
+    let json_block =
+        serde_json::to_string(&Publication::Block(block)).expect("can jsonify request");
+    info!("broadcasting new block");
+    behaviour
+        .floodsub
+        .publish(BLOCK_TOPIC.clone(), json_block.as_bytes());
 }

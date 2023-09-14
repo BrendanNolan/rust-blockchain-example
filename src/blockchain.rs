@@ -37,6 +37,16 @@ impl BlockChain {
             BlockAddStatus::NotAdded
         }
     }
+
+    pub fn mine_block(&mut self, data: &str) {
+        let latest_block = self.blocks.last().expect("there is at least one block");
+        let block = Block::mine(
+            latest_block.id + 1,
+            latest_block.hash.clone(),
+            data.to_owned(),
+        );
+        self.blocks.push(block);
+    }
 }
 
 pub fn choose_longer_valid_chain<'a>(local: &'a [Block], remote: &'a [Block]) -> &'a [Block] {

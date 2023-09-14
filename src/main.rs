@@ -1,3 +1,4 @@
+use crate::block::Block;
 use crate::blockchain::BlockChain;
 use libp2p::{
     core::upgrade,
@@ -94,11 +95,21 @@ async fn main() {
             EventType::Input(line) => match line.as_str() {
                 "ls p" => p2p::print_peers(&swarm),
                 cmd if cmd.starts_with("ls c") => p2p::print_chain(&swarm),
-                cmd if cmd.starts_with("create b") => p2p::mine_block(cmd, &mut swarm),
+                cmd if cmd.starts_with("create b") => {
+                    if let Some(data) = cmd.strip_prefix("create b") {
+                        let new_block = mine_block(data, &mut swarm.behaviour_mut().blockchain);
+                        p2p::send_block(new_block, &mut swarm);
+                    }
+                }
                 _ => error!("unknown command"),
             },
         }
     }
+}
+
+fn mine_block(data: &str, blockchain: &mut BlockChain) -> Block {
+    blockchain.mine_block(data);
+    blockchain.blocks.last().unwrap().clone()
 }
 
 enum EventType {
