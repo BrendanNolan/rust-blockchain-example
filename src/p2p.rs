@@ -53,7 +53,7 @@ pub struct AppBehaviour {
     #[behaviour(ignore)]
     pub response_sender: mpsc::UnboundedSender<ChainResponse>,
     #[behaviour(ignore)]
-    pub init_sender: mpsc::UnboundedSender<bool>,
+    pub init_sender: mpsc::UnboundedSender<()>,
     #[behaviour(ignore)]
     pub blockchain: BlockChain,
 }
@@ -62,7 +62,7 @@ impl AppBehaviour {
     pub async fn new(
         app: BlockChain,
         response_sender: mpsc::UnboundedSender<ChainResponse>,
-        init_sender: mpsc::UnboundedSender<bool>,
+        init_sender: mpsc::UnboundedSender<()>,
     ) -> Self {
         let mut behaviour = Self {
             blockchain: app,

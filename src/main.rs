@@ -61,7 +61,7 @@ async fn main() {
     tokio::spawn(async move {
         sleep(Duration::from_secs(1)).await;
         info!("sending init event");
-        init_sender.send(true).expect("can send init event");
+        init_sender.send(()).expect("can send init event");
     });
 
     loop {
@@ -71,7 +71,7 @@ async fn main() {
                 response = response_rcv.recv() => {
                     Some(p2p::EventType::LocalChainResponse(response.expect("response exists")))
                 },
-                _init = init_rcv.recv() => {
+                _ = init_rcv.recv() => {
                     Some(p2p::EventType::Init)
                 }
                 event = swarm.select_next_some() => {
