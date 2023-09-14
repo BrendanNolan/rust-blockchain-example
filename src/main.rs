@@ -9,6 +9,7 @@ use libp2p::{
     Transport,
 };
 use log::{error, info};
+use p2p::SerializablePeerId;
 use std::time::Duration;
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
@@ -91,15 +92,8 @@ async fn main() {
 
                 info!("connected nodes: {}", peers.len());
                 if !peers.is_empty() {
-                    let req = p2p::ChainRequest {
-                        from_peer_id: peers.iter().last().expect("at least one peer").clone(),
-                    };
-
-                    let json = serde_json::to_string(&req).expect("can jsonify request");
-                    swarm
-                        .behaviour_mut()
-                        .floodsub
-                        .publish(p2p::CHAIN_TOPIC.clone(), json.as_bytes());
+                    let last_peer = peers.last().expect("can get last peer");
+                    request_chain(&mut swarm, last_peer.clone());
                 }
             }
             p2p::EventType::LocalChainResponse(resp) => {
@@ -117,4 +111,13 @@ async fn main() {
             },
         }
     }
+}
+
+fn request_chain(swarm: &mut Swarm<p2p::AppBehaviour>, peer: SerializablePeerId) {
+    let req = p2p::ChainRequest { from_peer_id: peer };
+    let json = serde_json::to_string(&req).expect("can jsonify request");
+    swarm
+        .behaviour_mut()
+        .floodsub
+        .publish(p2p::CHAIN_TOPIC.clone(), json.as_bytes());
 }
