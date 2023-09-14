@@ -13,7 +13,6 @@ use log::{error, info};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
-use tokio::sync::mpsc;
 
 pub static KEYS: Lazy<identity::Keypair> = Lazy::new(identity::Keypair::generate_ed25519);
 pub static PEER_ID: Lazy<PeerId> = Lazy::new(|| PeerId::from(KEYS.public()));
@@ -30,48 +29,32 @@ impl SerializablePeerId {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ChainResponse {
-    pub blocks: Vec<Block>,
-    pub receiver: SerializablePeerId,
+struct ChainResponse {
+    blocks: Vec<Block>,
+    receiver: SerializablePeerId,
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-pub struct ChainRequest {
-    pub from_peer_id: SerializablePeerId,
-}
-
-pub enum EventType {
-    ChainResponse(ChainResponse),
-    Input(String),
-    Init,
+struct ChainRequest {
+    from_peer_id: SerializablePeerId,
 }
 
 #[derive(NetworkBehaviour)]
 pub struct AppBehaviour {
-    pub floodsub: Floodsub,
-    pub mdns: Mdns,
-    #[behaviour(ignore)]
-    pub response_sender: mpsc::UnboundedSender<ChainResponse>,
-    #[behaviour(ignore)]
-    pub init_sender: mpsc::UnboundedSender<()>,
+    floodsub: Floodsub,
+    mdns: Mdns,
     #[behaviour(ignore)]
     pub blockchain: BlockChain,
 }
 
 impl AppBehaviour {
-    pub async fn new(
-        app: BlockChain,
-        response_sender: mpsc::UnboundedSender<ChainResponse>,
-        init_sender: mpsc::UnboundedSender<()>,
-    ) -> Self {
+    pub async fn new(app: BlockChain) -> Self {
         let mut behaviour = Self {
             blockchain: app,
             floodsub: Floodsub::new(*PEER_ID),
             mdns: Mdns::new(Default::default())
                 .await
                 .expect("can create mdns"),
-            response_sender,
-            init_sender,
         };
         behaviour.floodsub.subscribe(CHAIN_TOPIC.clone());
         behaviour.floodsub.subscribe(BLOCK_TOPIC.clone());
@@ -80,7 +63,7 @@ impl AppBehaviour {
 }
 
 #[derive(Serialize, Deserialize)]
-pub enum Publication {
+enum Publication {
     ChainRequest(ChainRequest),
     ChainResponse(ChainResponse),
     Block(Block),
@@ -123,9 +106,10 @@ fn try_send_chain(app_behaviour: &mut AppBehaviour, req: ChainRequest, target: &
         blocks: app_behaviour.blockchain.blocks.clone(),
         receiver: SerializablePeerId(target.to_string()),
     };
-    if let Err(e) = app_behaviour.response_sender.send(response) {
-        error!("error sending response via channel, {}", e);
-    }
+    let json_resp = serde_json::to_string(&response).expect("can jsonify response");
+    app_behaviour
+        .floodsub
+        .publish(CHAIN_TOPIC.clone(), json_resp.as_bytes());
 }
 
 fn try_add_new_block(app_behaviour: &mut AppBehaviour, block: Block, source: &PeerId) {
@@ -204,4 +188,14 @@ pub fn handle_create_block(cmd: &str, swarm: &mut Swarm<AppBehaviour>) {
     behaviour
         .floodsub
         .publish(BLOCK_TOPIC.clone(), json_block.as_bytes());
+}
+
+pub fn request_chain(swarm: &mut Swarm<AppBehaviour>, peer: SerializablePeerId) {
+    let req = ChainRequest { from_peer_id: peer };
+    let json_req =
+        serde_json::to_string(&Publication::ChainRequest(req)).expect("can jsonify request");
+    swarm
+        .behaviour_mut()
+        .floodsub
+        .publish(CHAIN_TOPIC.clone(), json_req.as_bytes());
 }

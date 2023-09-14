@@ -9,7 +9,6 @@ use libp2p::{
     Transport,
 };
 use log::{error, info};
-use p2p::{Publication, SerializablePeerId};
 use std::time::Duration;
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
@@ -27,7 +26,6 @@ async fn main() {
     pretty_env_logger::init();
 
     info!("Peer Id: {}", p2p::PEER_ID.clone());
-    let (response_sender, mut response_rcv) = mpsc::unbounded_channel();
     let (init_sender, mut init_rcv) = mpsc::unbounded_channel();
 
     let auth_keys = Keypair::<X25519Spec>::new()
@@ -40,8 +38,7 @@ async fn main() {
         .multiplex(mplex::MplexConfig::new())
         .boxed();
 
-    let behaviour =
-        p2p::AppBehaviour::new(BlockChain::new(), response_sender, init_sender.clone()).await;
+    let behaviour = p2p::AppBehaviour::new(BlockChain::new()).await;
 
     let mut swarm = SwarmBuilder::new(transp, behaviour, *p2p::PEER_ID)
         .executor(Box::new(|fut| {
@@ -68,13 +65,10 @@ async fn main() {
     loop {
         let evt = {
             select! {
-                line = stdin.next_line() => Some(p2p::EventType::Input(
+                line = stdin.next_line() => Some(EventType::Input(
                     line.expect("can get line").expect("can read line from stdin"))),
-                response = response_rcv.recv() => {
-                    Some(p2p::EventType::ChainResponse(response.expect("response exists")))
-                },
                 _ = init_rcv.recv() => {
-                    Some(p2p::EventType::Init)
+                    Some(EventType::Init)
                 }
                 event = swarm.select_next_some() => {
                     info!("Unhandled Swarm Event: {:?}", event);
@@ -87,25 +81,17 @@ async fn main() {
             continue;
         };
         match event {
-            p2p::EventType::Init => {
+            EventType::Init => {
                 let peers = p2p::get_peers(&swarm);
                 swarm.behaviour_mut().blockchain.genesis();
 
                 info!("connected nodes: {}", peers.len());
                 if !peers.is_empty() {
                     let last_peer = peers.last().expect("can get last peer");
-                    request_chain(&mut swarm, last_peer.clone());
+                    p2p::request_chain(&mut swarm, last_peer.clone());
                 }
             }
-            p2p::EventType::ChainResponse(resp) => {
-                let json_resp = serde_json::to_string(&Publication::ChainResponse(resp))
-                    .expect("can jsonify response");
-                swarm
-                    .behaviour_mut()
-                    .floodsub
-                    .publish(p2p::CHAIN_TOPIC.clone(), json_resp.as_bytes());
-            }
-            p2p::EventType::Input(line) => match line.as_str() {
+            EventType::Input(line) => match line.as_str() {
                 "ls p" => p2p::handle_print_peers(&swarm),
                 cmd if cmd.starts_with("ls c") => p2p::handle_print_chain(&swarm),
                 cmd if cmd.starts_with("create b") => p2p::handle_create_block(cmd, &mut swarm),
@@ -115,12 +101,7 @@ async fn main() {
     }
 }
 
-fn request_chain(swarm: &mut Swarm<p2p::AppBehaviour>, peer: SerializablePeerId) {
-    let req = p2p::ChainRequest { from_peer_id: peer };
-    let json_req =
-        serde_json::to_string(&Publication::ChainRequest(req)).expect("can jsonify request");
-    swarm
-        .behaviour_mut()
-        .floodsub
-        .publish(p2p::CHAIN_TOPIC.clone(), json_req.as_bytes());
+enum EventType {
+    Input(String),
+    Init,
 }
