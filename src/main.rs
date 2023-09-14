@@ -12,7 +12,7 @@ use log::{error, info};
 use std::time::Duration;
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
-    select, spawn,
+    select,
     sync::mpsc,
     time::sleep,
 };
@@ -44,7 +44,7 @@ async fn main() {
 
     let mut swarm = SwarmBuilder::new(transp, behaviour, *p2p::PEER_ID)
         .executor(Box::new(|fut| {
-            spawn(fut);
+            tokio::spawn(fut);
         }))
         .build();
 
@@ -58,7 +58,7 @@ async fn main() {
     )
     .expect("swarm can be started");
 
-    spawn(async move {
+    tokio::spawn(async move {
         sleep(Duration::from_secs(1)).await;
         info!("sending init event");
         init_sender.send(true).expect("can send init event");
