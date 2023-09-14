@@ -154,19 +154,19 @@ pub fn get_peers(swarm: &Swarm<AppBehaviour>) -> Vec<SerializablePeerId> {
         .collect()
 }
 
-pub fn handle_print_peers(swarm: &Swarm<AppBehaviour>) {
+pub fn print_peers(swarm: &Swarm<AppBehaviour>) {
     let peers = get_peers(swarm);
     peers.iter().for_each(|p| info!("{}", p.0));
 }
 
-pub fn handle_print_chain(swarm: &Swarm<AppBehaviour>) {
+pub fn print_chain(swarm: &Swarm<AppBehaviour>) {
     info!("Local Blockchain:");
     let pretty_json = serde_json::to_string_pretty(&swarm.behaviour().blockchain.blocks)
         .expect("can jsonify blocks");
     info!("{}", pretty_json);
 }
 
-pub fn handle_create_block(cmd: &str, swarm: &mut Swarm<AppBehaviour>) {
+pub fn mine_block(cmd: &str, swarm: &mut Swarm<AppBehaviour>) {
     let Some(data) = cmd.strip_prefix("create b") else {
         return;
     };
@@ -176,7 +176,7 @@ pub fn handle_create_block(cmd: &str, swarm: &mut Swarm<AppBehaviour>) {
         .blocks
         .last()
         .expect("there is at least one block");
-    let block = Block::new(
+    let block = Block::mine(
         latest_block.id + 1,
         latest_block.hash.clone(),
         data.to_owned(),
