@@ -102,10 +102,10 @@ fn try_send_chain(app_behaviour: &mut AppBehaviour, req: ChainRequest, target: &
         return;
     }
     info!("sending local chain to {}", target.to_string());
-    let response = ChainResponse {
+    let response = Publication::ChainResponse(ChainResponse {
         blocks: app_behaviour.blockchain.blocks.clone(),
         receiver: SerializablePeerId(target.to_string()),
-    };
+    });
     let json_resp = serde_json::to_string(&response).expect("can jsonify response");
     app_behaviour
         .floodsub
