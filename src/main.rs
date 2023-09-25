@@ -1,4 +1,3 @@
-use crate::block::Block;
 use crate::blockchain::BlockChain;
 use libp2p::{
     core::upgrade,
@@ -64,25 +63,22 @@ async fn main() {
     });
 
     loop {
-        let evt = {
-            select! {
-                line = stdin.next_line() => Some(EventType::Input(
-                    line.expect("can get line").expect("can read line from stdin"))),
-                _ = init_rcv.recv() => {
-                    Some(EventType::Init)
+        select! {
+            line = stdin.next_line() => {
+                let line = line.unwrap().unwrap();
+                match line.as_str() {
+                    "ls p" => p2p::print_peers(&swarm),
+                    cmd if cmd.starts_with("ls c") => p2p::print_chain(&swarm),
+                    cmd if cmd.starts_with("create b") => {
+                        if let Some(data) = cmd.strip_prefix("create b") {
+                            let new_block = swarm.behaviour_mut().blockchain.mine_block_return_mined_clone(data);
+                            p2p::send_block(new_block, &mut swarm);
+                        }
+                    }
+                    _ => error!("unknown command"),
                 }
-                event = swarm.select_next_some() => {
-                    info!("Unhandled Swarm Event: {:?}", event);
-                    None
-                },
             }
-        };
-
-        let Some(event) = evt else {
-            continue;
-        };
-        match event {
-            EventType::Init => {
+            _ = init_rcv.recv() => {
                 let peers = p2p::get_peers(&swarm);
                 swarm.behaviour_mut().blockchain.genesis();
 
@@ -92,27 +88,10 @@ async fn main() {
                     p2p::request_chain(&mut swarm, last_peer.clone());
                 }
             }
-            EventType::Input(line) => match line.as_str() {
-                "ls p" => p2p::print_peers(&swarm),
-                cmd if cmd.starts_with("ls c") => p2p::print_chain(&swarm),
-                cmd if cmd.starts_with("create b") => {
-                    if let Some(data) = cmd.strip_prefix("create b") {
-                        let new_block = mine_block(data, &mut swarm.behaviour_mut().blockchain);
-                        p2p::send_block(new_block, &mut swarm);
-                    }
-                }
-                _ => error!("unknown command"),
+            event = swarm.select_next_some() => {
+                info!("Unhandled Swarm Event: {:?}", event);
+                continue;
             },
         }
     }
-}
-
-fn mine_block(data: &str, blockchain: &mut BlockChain) -> Block {
-    blockchain.mine_block(data);
-    blockchain.blocks.last().unwrap().clone()
-}
-
-enum EventType {
-    Input(String),
-    Init,
 }

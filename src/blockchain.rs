@@ -47,6 +47,11 @@ impl BlockChain {
         );
         self.blocks.push(block);
     }
+
+    pub fn mine_block_return_mined_clone(&mut self, data: &str) -> Block {
+        self.mine_block(data);
+        self.blocks.last().unwrap().clone()
+    }
 }
 
 pub fn choose_longer_valid_chain<'a>(local: &'a [Block], remote: &'a [Block]) -> &'a [Block] {
