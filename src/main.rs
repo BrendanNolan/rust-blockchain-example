@@ -24,13 +24,12 @@ mod p2p;
 #[tokio::main]
 async fn main() {
     pretty_env_logger::init();
-
     info!("Peer Id: {}", p2p::PEER_ID.clone());
+
+    let mut swarm = initialize_swarm().await;
+
     let (init_sender, mut init_rcv) = mpsc::unbounded_channel();
-
-    let mut swarm = initialise_swarm().await;
-
-    spawn_tasks_which_suspiciously_sleeps_and_then_sends_initialisation_event(init_sender);
+    spawn_task_which_suspiciously_sleeps_and_then_sends_initialization_event(init_sender);
 
     let mut stdin = BufReader::new(stdin()).lines();
 
@@ -46,7 +45,7 @@ async fn main() {
     }
 }
 
-async fn initialise_swarm() -> Swarm<AppBehaviour> {
+async fn initialize_swarm() -> Swarm<AppBehaviour> {
     let auth_keys = Keypair::<X25519Spec>::new()
         .into_authentic(&p2p::KEYS)
         .expect("can create auth keys");
@@ -102,7 +101,7 @@ fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
     }
 }
 
-fn spawn_tasks_which_suspiciously_sleeps_and_then_sends_initialisation_event(
+fn spawn_task_which_suspiciously_sleeps_and_then_sends_initialization_event(
     init_sender: mpsc::UnboundedSender<()>,
 ) {
     tokio::spawn(async move {
