@@ -28,6 +28,25 @@ async fn main() {
     info!("Peer Id: {}", p2p::PEER_ID.clone());
     let (init_sender, mut init_rcv) = mpsc::unbounded_channel();
 
+    let mut swarm = initialise_swarm().await;
+
+    spawn_tasks_which_suspiciously_sleeps_and_then_sends_initialisation_event(init_sender);
+
+    let mut stdin = BufReader::new(stdin()).lines();
+
+    loop {
+        select! {
+            line = stdin.next_line() => execute_user_command(&line.unwrap().unwrap(), &mut swarm),
+            _ = init_rcv.recv() => setup_initial_blockchain(&mut swarm),
+            event = swarm.select_next_some() => {
+                info!("Unhandled Swarm Event: {:?}", event);
+                continue;
+            },
+        }
+    }
+}
+
+async fn initialise_swarm() -> Swarm<AppBehaviour> {
     let auth_keys = Keypair::<X25519Spec>::new()
         .into_authentic(&p2p::KEYS)
         .expect("can create auth keys");
@@ -45,9 +64,6 @@ async fn main() {
             tokio::spawn(fut);
         }))
         .build();
-
-    let mut stdin = BufReader::new(stdin()).lines();
-
     Swarm::listen_on(
         &mut swarm,
         "/ip4/0.0.0.0/tcp/0"
@@ -56,22 +72,7 @@ async fn main() {
     )
     .expect("swarm can be started");
 
-    tokio::spawn(async move {
-        sleep(Duration::from_secs(1)).await;
-        info!("sending init event");
-        init_sender.send(()).expect("can send init event");
-    });
-
-    loop {
-        select! {
-            line = stdin.next_line() => execute_user_command(&line.unwrap().unwrap(), &mut swarm),
-            _ = init_rcv.recv() => setup_initial_blockchain(&mut swarm),
-            event = swarm.select_next_some() => {
-                info!("Unhandled Swarm Event: {:?}", event);
-                continue;
-            },
-        }
-    }
+    swarm
 }
 
 fn execute_user_command(line: &str, swarm: &mut Swarm<AppBehaviour>) {
@@ -99,4 +100,14 @@ fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
         let last_peer = peers.last().expect("can get last peer");
         p2p::request_chain(swarm, last_peer.clone());
     }
+}
+
+fn spawn_tasks_which_suspiciously_sleeps_and_then_sends_initialisation_event(
+    init_sender: mpsc::UnboundedSender<()>,
+) {
+    tokio::spawn(async move {
+        sleep(Duration::from_secs(1)).await;
+        info!("sending init event");
+        init_sender.send(()).expect("can send init event");
+    });
 }
