@@ -36,7 +36,7 @@ async fn main() {
     loop {
         select! {
             line = stdin.next_line() => execute_user_command(&line.unwrap().unwrap(), &mut swarm),
-            _ = init_rcv.recv() => setup_initial_blockchain(&mut swarm),
+            Some(()) = init_rcv.recv() => setup_initial_blockchain(&mut swarm),
             event = swarm.select_next_some() => {
                 info!("Unhandled Swarm Event: {:?}", event);
                 continue;
