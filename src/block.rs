@@ -42,7 +42,7 @@ pub fn new_block_valid(new_block: &Block, previous_block: &Block) -> bool {
         warn!("block with id: {} has wrong previous hash", new_block.id);
         return false;
     }
-    if !has_correct_form(&new_block.hash) {
+    if !has_correct_form(&hex::decode(&new_block.hash).expect("can decode from hex")) {
         warn!(
             "block with id: {} has hash with incorrect form",
             new_block.id
@@ -66,9 +66,8 @@ fn hash_consistent_with_other_data(block: &Block) -> bool {
     )) == block.hash
 }
 
-fn has_correct_form(hash: &str) -> bool {
-    hash_to_binary_representation(&hex::decode(hash).expect("can decode from hex"))
-        .starts_with(DIFFICULTY_PREFIX)
+fn has_correct_form(hash: &[u8]) -> bool {
+    hash_to_binary_representation(hash).starts_with(DIFFICULTY_PREFIX)
 }
 
 fn calculate_hash(id: u64, timestamp: i64, previous_hash: &str, data: &str, nonce: u64) -> Vec<u8> {
@@ -93,8 +92,8 @@ fn mine_block(id: u64, timestamp: i64, previous_hash: &str, data: &str) -> (u64,
             info!("nonce: {}", nonce);
         }
         let hash = calculate_hash(id, timestamp, previous_hash, data, nonce);
-        let binary_hash = hash_to_binary_representation(&hash);
-        if has_correct_form(&binary_hash) {
+        if has_correct_form(&hash) {
+            let binary_hash = hash_to_binary_representation(&hash);
             info!(
                 "mined! nonce: {}, hash: {}, binary hash: {}",
                 nonce,
