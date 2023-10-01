@@ -9,12 +9,9 @@ use libp2p::{
     Transport,
 };
 use log::{error, info};
-use std::time::Duration;
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
     select,
-    sync::mpsc,
-    time::sleep,
 };
 
 mod block;
@@ -27,18 +24,15 @@ async fn main() {
     info!("Peer Id: {}", p2p::PEER_ID.clone());
 
     let mut swarm = initialize_swarm().await;
-
-    let (init_sender, mut init_rcv) = mpsc::unbounded_channel();
-    spawn_task_which_suspiciously_sleeps_and_then_sends_initialization_event(init_sender);
+    setup_initial_blockchain(&mut swarm);
 
     let mut stdin = BufReader::new(stdin()).lines();
-
     loop {
         select! {
             line = stdin.next_line() => execute_user_command(&line.unwrap().unwrap(), &mut swarm),
-            Some(()) = init_rcv.recv() => setup_initial_blockchain(&mut swarm),
             event = swarm.select_next_some() => {
-                info!("Unhandled Swarm Event: {:?}", event);
+                info!("Drove swarm forward by selecting next event: {:?}. But did not handle that \
+                      event.", event);
                 continue;
             },
         }
@@ -99,14 +93,4 @@ fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
         let last_peer = peers.last().expect("can get last peer");
         p2p::request_chain(swarm, last_peer.clone());
     }
-}
-
-fn spawn_task_which_suspiciously_sleeps_and_then_sends_initialization_event(
-    init_sender: mpsc::UnboundedSender<()>,
-) {
-    tokio::spawn(async move {
-        sleep(Duration::from_secs(1)).await;
-        info!("sending init event");
-        init_sender.send(()).expect("can send init event");
-    });
 }
