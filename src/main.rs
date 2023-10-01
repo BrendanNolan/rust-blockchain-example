@@ -30,11 +30,7 @@ async fn main() {
     loop {
         select! {
             line = stdin.next_line() => execute_user_command(&line.unwrap().unwrap(), &mut swarm),
-            event = swarm.select_next_some() => {
-                info!("Drove swarm forward by selecting next event: {:?}. But did not handle that \
-                      event.", event);
-                continue;
-            },
+            _ = drive_forward(&mut swarm) => {},
         }
     }
 }
@@ -93,4 +89,12 @@ fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
         let last_peer = peers.last().expect("can get last peer");
         p2p::request_chain(swarm, last_peer.clone());
     }
+}
+
+async fn drive_forward(swarm: &mut Swarm<AppBehaviour>) {
+    let event = swarm.select_next_some().await;
+    info!(
+        "Drove swarm forward by selecting next event: {:?}. But did not handle that event.",
+        event
+    );
 }
