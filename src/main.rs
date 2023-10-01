@@ -1,13 +1,5 @@
-use crate::{blockchain::BlockChain, p2p::AppBehaviour};
-use libp2p::{
-    core::upgrade,
-    futures::StreamExt,
-    mplex,
-    noise::{Keypair, NoiseConfig, X25519Spec},
-    swarm::{Swarm, SwarmBuilder},
-    tcp::TokioTcpConfig,
-    Transport,
-};
+use crate::p2p::AppBehaviour;
+use libp2p::{futures::StreamExt, swarm::Swarm};
 use log::{error, info};
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
@@ -23,7 +15,7 @@ async fn main() {
     pretty_env_logger::init();
     info!("Peer Id: {}", p2p::PEER_ID.clone());
 
-    let mut swarm = initialize_swarm().await;
+    let mut swarm = p2p::initialize_swarm().await;
     setup_initial_blockchain(&mut swarm);
 
     let mut stdin = BufReader::new(stdin()).lines();
@@ -33,35 +25,6 @@ async fn main() {
             _ = drive_forward(&mut swarm) => {},
         }
     }
-}
-
-async fn initialize_swarm() -> Swarm<AppBehaviour> {
-    let auth_keys = Keypair::<X25519Spec>::new()
-        .into_authentic(&p2p::KEYS)
-        .expect("can create auth keys");
-
-    let transp = TokioTcpConfig::new()
-        .upgrade(upgrade::Version::V1)
-        .authenticate(NoiseConfig::xx(auth_keys).into_authenticated())
-        .multiplex(mplex::MplexConfig::new())
-        .boxed();
-
-    let behaviour = p2p::AppBehaviour::new(BlockChain::new()).await;
-
-    let mut swarm = SwarmBuilder::new(transp, behaviour, *p2p::PEER_ID)
-        .executor(Box::new(|fut| {
-            tokio::spawn(fut);
-        }))
-        .build();
-    Swarm::listen_on(
-        &mut swarm,
-        "/ip4/0.0.0.0/tcp/0"
-            .parse()
-            .expect("can get a local socket"),
-    )
-    .expect("swarm can be started");
-
-    swarm
 }
 
 fn execute_user_command(line: &str, swarm: &mut Swarm<AppBehaviour>) {

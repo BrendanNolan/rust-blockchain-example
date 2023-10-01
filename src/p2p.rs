@@ -3,11 +3,15 @@ use super::{
     blockchain::{self, BlockAddStatus, BlockChain},
 };
 use libp2p::{
+    core::upgrade,
     floodsub::{Floodsub, FloodsubEvent, Topic},
     identity,
     mdns::{Mdns, MdnsEvent},
-    swarm::{NetworkBehaviourEventProcess, Swarm},
-    NetworkBehaviour, PeerId,
+    mplex,
+    noise::{Keypair, NoiseConfig, X25519Spec},
+    swarm::{NetworkBehaviourEventProcess, Swarm, SwarmBuilder},
+    tcp::TokioTcpConfig,
+    NetworkBehaviour, PeerId, Transport,
 };
 use log::{error, info};
 use once_cell::sync::Lazy;
@@ -60,6 +64,35 @@ impl AppBehaviour {
         behaviour.floodsub.subscribe(BLOCK_TOPIC.clone());
         behaviour
     }
+}
+
+pub async fn initialize_swarm() -> Swarm<AppBehaviour> {
+    let auth_keys = Keypair::<X25519Spec>::new()
+        .into_authentic(&KEYS)
+        .expect("can create auth keys");
+
+    let transp = TokioTcpConfig::new()
+        .upgrade(upgrade::Version::V1)
+        .authenticate(NoiseConfig::xx(auth_keys).into_authenticated())
+        .multiplex(mplex::MplexConfig::new())
+        .boxed();
+
+    let behaviour = AppBehaviour::new(BlockChain::new()).await;
+
+    let mut swarm = SwarmBuilder::new(transp, behaviour, *PEER_ID)
+        .executor(Box::new(|fut| {
+            tokio::spawn(fut);
+        }))
+        .build();
+    Swarm::listen_on(
+        &mut swarm,
+        "/ip4/0.0.0.0/tcp/0"
+            .parse()
+            .expect("can get a local socket"),
+    )
+    .expect("swarm can be started");
+
+    swarm
 }
 
 #[derive(Serialize, Deserialize)]
