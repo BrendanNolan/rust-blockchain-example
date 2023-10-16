@@ -25,6 +25,7 @@ impl BlockChain {
             nonce: 2836,
             hash: "0000f816a87f806bb0073dcf026a64fb40c946b5abee2573702828694d5b4c43".to_string(),
         };
+        assert!(self.blocks.is_empty());
         self.blocks.push(genesis_block);
     }
 
