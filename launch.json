@@ -1,0 +1,27 @@
+{
+   "version": "0.2.0",
+   "configurations": [
+       {
+           "name": "Main With Log Level == info",
+           "type": "rt_lldb",
+           "request": "launch",
+           "cwd": "${workspaceFolder}",
+           "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}",
+           "env": {
+               "RUST_LOG": "info"
+           },
+           "stopAtEntry": true
+       },
+       {
+           "name": "Main With Log Level == debug",
+           "type": "rt_lldb",
+           "request": "launch",
+           "cwd": "${workspaceFolder}",
+           "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}",
+           "env": {
+               "RUST_LOG": "debug"
+           },
+           "stopAtEntry": true
+       }
+   ]
+}
