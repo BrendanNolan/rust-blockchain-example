@@ -17,6 +17,7 @@ use log::{error, info};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
+use tokio::sync;
 
 pub static KEYS: Lazy<identity::Keypair> = Lazy::new(identity::Keypair::generate_ed25519);
 pub static PEER_ID: Lazy<PeerId> = Lazy::new(|| PeerId::from(KEYS.public()));
@@ -49,12 +50,15 @@ pub struct AppBehaviour {
     mdns: Mdns,
     #[behaviour(ignore)]
     pub blockchain: BlockChain,
+    #[behaviour(ignore)]
+    pub init_sender: Option<sync::mpsc::UnboundedSender<()>>,
 }
 
 impl AppBehaviour {
-    pub async fn new(app: BlockChain) -> Self {
+    pub async fn new(blockchain: BlockChain, init: sync::mpsc::UnboundedSender<()>) -> Self {
         let mut behaviour = Self {
-            blockchain: app,
+            blockchain,
+            init_sender: Some(init),
             floodsub: Floodsub::new(*PEER_ID),
             mdns: Mdns::new(Default::default())
                 .await
@@ -66,7 +70,7 @@ impl AppBehaviour {
     }
 }
 
-pub async fn initialize_swarm() -> Swarm<AppBehaviour> {
+pub async fn initialize_swarm(init_sender: sync::mpsc::UnboundedSender<()>) -> Swarm<AppBehaviour> {
     let auth_keys = Keypair::<X25519Spec>::new()
         .into_authentic(&KEYS)
         .expect("can create auth keys");
@@ -77,7 +81,7 @@ pub async fn initialize_swarm() -> Swarm<AppBehaviour> {
         .multiplex(mplex::MplexConfig::new())
         .boxed();
 
-    let behaviour = AppBehaviour::new(BlockChain::new()).await;
+    let behaviour = AppBehaviour::new(BlockChain::new(), init_sender).await;
 
     let mut swarm = SwarmBuilder::new(transp, behaviour, *PEER_ID)
         .executor(Box::new(|fut| {
@@ -162,8 +166,12 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
     fn inject_event(&mut self, event: MdnsEvent) {
         match event {
             MdnsEvent::Discovered(discovered_addresses) => {
+                let discovered_addresses = discovered_addresses.peekable();
                 for (peer, _addr) in discovered_addresses {
                     self.floodsub.add_node_to_partial_view(peer);
+                }
+                if let Some(init_sender) = self.init_sender.take() {
+                    init_sender.send(()).expect("can send init signal");
                 }
             }
             MdnsEvent::Expired(expired_addresses) => {

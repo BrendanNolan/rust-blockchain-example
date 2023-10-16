@@ -3,7 +3,7 @@ use libp2p::{futures::StreamExt, swarm::Swarm};
 use log::{debug, error, info};
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
-    select,
+    select, sync,
 };
 
 mod block;
@@ -15,12 +15,14 @@ async fn main() {
     pretty_env_logger::init();
     info!("Peer Id: {}", p2p::PEER_ID.clone());
 
-    let mut swarm = p2p::initialize_swarm().await;
+    let (init_sender, mut init_receiver) = sync::mpsc::unbounded_channel::<()>();
+    let mut swarm = p2p::initialize_swarm(init_sender).await;
     setup_initial_blockchain(&mut swarm);
 
     let mut stdin = BufReader::new(stdin()).lines();
     loop {
         select! {
+            Some(()) = init_receiver.recv() => setup_initial_blockchain(&mut swarm),
             line = stdin.next_line() => execute_user_command(&line.unwrap().unwrap(), &mut swarm),
             _ = drive_forward(&mut swarm) => {},
         }
@@ -46,6 +48,7 @@ fn execute_user_command(line: &str, swarm: &mut Swarm<AppBehaviour>) {
 
 fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
     let peers = p2p::get_peers(swarm);
+    assert!(!peers.is_empty(), "no peers found");
     swarm.behaviour_mut().blockchain.genesis();
     info!("connected nodes: {}", peers.len());
     if !peers.is_empty() {
