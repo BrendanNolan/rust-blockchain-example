@@ -29,6 +29,13 @@ impl BlockChain {
         self.blocks.push(genesis_block);
     }
 
+    pub fn is_genesis_block_only(&self) -> bool {
+        self.blocks.len() == 1
+            && self.blocks[0].previous_hash == "genesis"
+            && self.blocks[0].data == "genesis!"
+            && self.blocks[0].id == 0
+    }
+
     pub fn try_add_block(&mut self, new_block: Block) -> BlockAddStatus {
         let latest_block = self.blocks.last().expect("there is at least one block");
         if block::new_block_valid(&new_block, latest_block) {
