@@ -134,11 +134,6 @@ pub fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
     info!("setting up initial blockchain");
     let peers = get_peers(swarm);
     assert!(!peers.is_empty(), "no peers found");
-    let blockchain = &mut swarm.behaviour_mut().blockchain;
-    if blockchain.is_empty() {
-        info!("Performing genesis");
-        swarm.behaviour_mut().blockchain.genesis();
-    }
     let peer = peers.last().expect("can get peer");
     info!(
         "Will ask one of the connected nodes, {}, for its blockchain.",

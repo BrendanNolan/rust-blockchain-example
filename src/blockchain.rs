@@ -13,10 +13,14 @@ pub enum BlockAddStatus {
 
 impl BlockChain {
     pub fn new() -> Self {
-        Self { blocks: vec![] }
+        let mut blockchain = Self { blocks: vec![] };
+        blockchain.genesis();
+        blockchain
     }
 
-    pub fn genesis(&mut self) {
+    fn genesis(&mut self) {
+        assert!(self.blocks.is_empty());
+        info!("Performing Genesis");
         let genesis_block = Block {
             id: 0,
             timestamp: 0,
@@ -25,7 +29,6 @@ impl BlockChain {
             nonce: 2836,
             hash: "0000f816a87f806bb0073dcf026a64fb40c946b5abee2573702828694d5b4c43".to_string(),
         };
-        assert!(self.blocks.is_empty());
         self.blocks.push(genesis_block);
     }
 
@@ -34,10 +37,6 @@ impl BlockChain {
             && self.blocks[0].previous_hash == "genesis"
             && self.blocks[0].data == "genesis!"
             && self.blocks[0].id == 0
-    }
-
-    pub fn is_empty(&self) -> bool {
-        self.blocks.is_empty()
     }
 
     pub fn try_add_block(&mut self, new_block: Block) -> BlockAddStatus {
