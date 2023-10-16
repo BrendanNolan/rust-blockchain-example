@@ -67,6 +67,7 @@ fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
         peer.id()
     );
     p2p::request_chain(swarm, peer.clone());
+    info!("Blockchain requested");
 }
 
 async fn drive_forward(swarm: &mut Swarm<AppBehaviour>) {
