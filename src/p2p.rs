@@ -129,6 +129,11 @@ fn try_accept_chain(app_behaviour: &mut AppBehaviour, resp: ChainResponse, sourc
     info!("Chain response from {}:", source);
     resp.blocks.iter().for_each(|r| info!("{:?}", r));
 
+    if app_behaviour.blockchain.blocks.len() == 1 {
+        app_behaviour.blockchain.blocks = resp.blocks;
+        return;
+    }
+
     app_behaviour.blockchain.blocks =
         blockchain::choose_longer_valid_chain(&app_behaviour.blockchain.blocks, &resp.blocks)
             .into();
