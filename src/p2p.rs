@@ -28,6 +28,10 @@ pub static BLOCK_TOPIC: Lazy<Topic> = Lazy::new(|| Topic::new("blocks"));
 pub struct SerializablePeerId(String);
 
 impl SerializablePeerId {
+    pub fn id(&self) -> &str {
+        &self.0
+    }
+
     fn equal(&self, b: &PeerId) -> bool {
         self.0 == b.to_string()
     }
@@ -199,12 +203,12 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
 pub fn get_peers(swarm: &Swarm<AppBehaviour>) -> Vec<SerializablePeerId> {
     info!("Discovered Peers:");
     let nodes = swarm.behaviour().mdns.discovered_nodes();
-    let peers = nodes
+    let peers: Vec<_> = nodes
         .collect::<HashSet<_>>()
         .iter()
         .map(|p| SerializablePeerId(p.to_string()))
         .collect();
-    info!("{:?}", peers);
+    peers.iter().for_each(|peer| info!("{}", peer.id()));
     peers
 }
 

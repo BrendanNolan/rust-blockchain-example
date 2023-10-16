@@ -61,20 +61,15 @@ fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
     assert!(!peers.is_empty(), "no peers found");
     info!("Performing genesis");
     swarm.behaviour_mut().blockchain.genesis();
+    let peer = peers.last().expect("can get peer");
     info!(
-        "Will ask the last of these connected nodes for its blockchain: {:?}",
-        peers
+        "Will ask one of the connected nodes, {}, for its blockchain.",
+        peer.id()
     );
-    if !peers.is_empty() {
-        let last_peer = peers.last().expect("can get last peer");
-        p2p::request_chain(swarm, last_peer.clone());
-    }
+    p2p::request_chain(swarm, peer.clone());
 }
 
 async fn drive_forward(swarm: &mut Swarm<AppBehaviour>) {
-    let event = swarm.select_next_some().await;
-    debug!(
-        "Drove swarm forward by selecting next event: {:?}. But did not handle that event.",
-        event
-    );
+    let _event = swarm.select_next_some().await;
+    debug!("Drove swarm forward by selecting next event, but did not handle that event.",);
 }
