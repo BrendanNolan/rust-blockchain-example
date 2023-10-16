@@ -1,6 +1,6 @@
 use crate::p2p::AppBehaviour;
 use libp2p::{futures::StreamExt, swarm::Swarm};
-use log::{error, info};
+use log::{debug, error, info};
 use tokio::{
     io::{stdin, AsyncBufReadExt, BufReader},
     select,
@@ -56,7 +56,7 @@ fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
 
 async fn drive_forward(swarm: &mut Swarm<AppBehaviour>) {
     let event = swarm.select_next_some().await;
-    info!(
+    debug!(
         "Drove swarm forward by selecting next event: {:?}. But did not handle that event.",
         event
     );
