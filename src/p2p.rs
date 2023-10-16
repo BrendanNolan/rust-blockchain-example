@@ -28,6 +28,10 @@ pub static BLOCK_TOPIC: Lazy<Topic> = Lazy::new(|| Topic::new("blocks"));
 pub struct SerializablePeerId(String);
 
 impl SerializablePeerId {
+    pub fn new(id: &PeerId) -> Self {
+        Self(id.to_string())
+    }
+
     pub fn id(&self) -> &str {
         &self.0
     }
@@ -143,7 +147,7 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for AppBehaviour {
 }
 
 fn try_accept_chain(app_behaviour: &mut AppBehaviour, resp: ChainResponse, source: &PeerId) {
-    if resp.receiver != SerializablePeerId(PEER_ID.to_string()) {
+    if resp.receiver != SerializablePeerId::new(&PEER_ID) {
         return;
     }
     info!("Chain response from {}:", source);
@@ -166,7 +170,7 @@ fn try_send_chain(app_behaviour: &mut AppBehaviour, req: ChainRequest, target: &
     info!("sending local chain to {}", target.to_string());
     let response = Publication::ChainResponse(ChainResponse {
         blocks: app_behaviour.blockchain.blocks.clone(),
-        receiver: SerializablePeerId(target.to_string()),
+        receiver: SerializablePeerId::new(target),
     });
     let json_resp = serde_json::to_string(&response).expect("can jsonify response");
     app_behaviour
@@ -225,7 +229,7 @@ pub fn get_peers(swarm: &Swarm<AppBehaviour>) -> Vec<SerializablePeerId> {
     let peers: Vec<_> = nodes
         .collect::<HashSet<_>>()
         .iter()
-        .map(|p| SerializablePeerId(p.to_string()))
+        .map(|p| SerializablePeerId::new(p))
         .collect();
     peers.iter().for_each(|peer| info!("{}", peer.id()));
     peers
