@@ -5,7 +5,7 @@ use sha2::{Digest, Sha256};
 
 const DIFFICULTY_PREFIX: &str = "00";
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
 pub struct Block {
     pub id: u64,
     pub hash: String,

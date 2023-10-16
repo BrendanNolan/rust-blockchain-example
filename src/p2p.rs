@@ -2,6 +2,7 @@ use super::{
     block::Block,
     blockchain::{self, BlockAddStatus, BlockChain},
 };
+use crate::retry;
 use libp2p::{
     core::upgrade,
     floodsub::{Floodsub, FloodsubEvent, Topic},
@@ -59,14 +60,25 @@ pub struct AppBehaviour {
     #[behaviour(ignore)]
     pub blockchain: BlockChain,
     #[behaviour(ignore)]
-    pub init_sender: Option<sync::mpsc::UnboundedSender<()>>,
+    pub tx_init: Option<sync::mpsc::UnboundedSender<()>>,
+    #[behaviour(ignore)]
+    pub tx_initialized: Option<sync::mpsc::UnboundedSender<()>>,
+    #[behaviour(ignore)]
+    pub rx_initialized: Option<sync::mpsc::UnboundedReceiver<()>>,
 }
 
 impl AppBehaviour {
-    pub async fn new(blockchain: BlockChain, init: sync::mpsc::UnboundedSender<()>) -> Self {
+    pub async fn new(
+        blockchain: BlockChain,
+        init: sync::mpsc::UnboundedSender<()>,
+        tx_initialized: sync::mpsc::UnboundedSender<()>,
+        rx_initialized: sync::mpsc::UnboundedReceiver<()>,
+    ) -> Self {
         let mut behaviour = Self {
             blockchain,
-            init_sender: Some(init),
+            tx_init: Some(init),
+            tx_initialized: Some(tx_initialized),
+            rx_initialized: Some(rx_initialized),
             floodsub: Floodsub::new(*PEER_ID),
             mdns: Mdns::new(Default::default())
                 .await
@@ -79,7 +91,11 @@ impl AppBehaviour {
     }
 }
 
-pub async fn initialize_swarm(init_sender: sync::mpsc::UnboundedSender<()>) -> Swarm<AppBehaviour> {
+pub async fn initialize_swarm(
+    init_sender: sync::mpsc::UnboundedSender<()>,
+    tx_initialized: sync::mpsc::UnboundedSender<()>,
+    rx_initialized: sync::mpsc::UnboundedReceiver<()>,
+) -> Swarm<AppBehaviour> {
     let auth_keys = Keypair::<X25519Spec>::new()
         .into_authentic(&KEYS)
         .expect("can create auth keys");
@@ -90,7 +106,13 @@ pub async fn initialize_swarm(init_sender: sync::mpsc::UnboundedSender<()>) -> S
         .multiplex(mplex::MplexConfig::new())
         .boxed();
 
-    let behaviour = AppBehaviour::new(BlockChain::new(), init_sender).await;
+    let behaviour = AppBehaviour::new(
+        BlockChain::new(),
+        init_sender,
+        tx_initialized,
+        rx_initialized,
+    )
+    .await;
 
     let mut swarm = SwarmBuilder::new(transp, behaviour, *PEER_ID)
         .executor(Box::new(|fut| {
@@ -112,8 +134,11 @@ pub fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
     info!("setting up initial blockchain");
     let peers = get_peers(swarm);
     assert!(!peers.is_empty(), "no peers found");
-    info!("Performing genesis");
-    swarm.behaviour_mut().blockchain.genesis();
+    let blockchain = &mut swarm.behaviour_mut().blockchain;
+    if blockchain.is_empty() {
+        info!("Performing genesis");
+        swarm.behaviour_mut().blockchain.genesis();
+    }
     let peer = peers.last().expect("can get peer");
     info!(
         "Will ask one of the connected nodes, {}, for its blockchain.",
@@ -140,27 +165,54 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for AppBehaviour {
         };
         match publication {
             Publication::ChainRequest(req) => try_send_chain(self, req, &msg.source),
-            Publication::ChainResponse(resp) => try_accept_chain(self, resp, &msg.source),
+            Publication::ChainResponse(resp) => {
+                if try_accept_chain(self, resp, &msg.source)
+                    == ChainAcceptance::AcceptedInitialChain
+                {
+                    if let Some(tx_initialized) = self.tx_initialized.take() {
+                        let _ = tx_initialized.send(());
+                    }
+                }
+            }
             Publication::Block(block) => try_add_new_block(self, block, &msg.source),
         }
     }
 }
 
-fn try_accept_chain(app_behaviour: &mut AppBehaviour, resp: ChainResponse, source: &PeerId) {
+#[derive(Debug, PartialEq, Eq)]
+enum ChainAcceptance {
+    AcceptedChainUpdate,
+    AcceptedInitialChain,
+    RejectedChainUpdate,
+    ChainIntendedForDifferentPeer,
+}
+
+fn try_accept_chain(
+    app_behaviour: &mut AppBehaviour,
+    resp: ChainResponse,
+    source: &PeerId,
+) -> ChainAcceptance {
     if resp.receiver != SerializablePeerId::new(&PEER_ID) {
-        return;
+        return ChainAcceptance::ChainIntendedForDifferentPeer;
     }
     info!("Chain response from {}:", source);
     resp.blocks.iter().for_each(|r| info!("{:?}", r));
 
     if app_behaviour.blockchain.is_genesis_block_only() {
         app_behaviour.blockchain.blocks = resp.blocks;
-        return;
+        return ChainAcceptance::AcceptedInitialChain;
     }
 
-    app_behaviour.blockchain.blocks =
+    let new_chain =
         blockchain::choose_longer_valid_chain(&app_behaviour.blockchain.blocks, &resp.blocks)
             .into();
+
+    if new_chain != app_behaviour.blockchain.blocks {
+        app_behaviour.blockchain.blocks = new_chain;
+        ChainAcceptance::AcceptedChainUpdate
+    } else {
+        ChainAcceptance::RejectedChainUpdate
+    }
 }
 
 fn try_send_chain(app_behaviour: &mut AppBehaviour, req: ChainRequest, target: &PeerId) {
@@ -205,11 +257,14 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
                     debug!("No peers discovered");
                     return;
                 }
-                if let Some(init_sender) = self.init_sender.take() {
-                    tokio::spawn(async move {
-                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                        init_sender.send(()).expect("can send init signal");
-                    });
+                if let Some(tx_init) = self.tx_init.take() {
+                    if let Some(rx_initialized) = self.rx_initialized.take() {
+                        tokio::spawn(retry::run_retry_loop(
+                            rx_initialized,
+                            tx_init,
+                            std::time::Duration::from_secs(5),
+                        ));
+                    }
                 }
             }
             MdnsEvent::Expired(expired_addresses) => {

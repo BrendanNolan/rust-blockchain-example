@@ -9,6 +9,7 @@ use tokio::{
 mod block;
 mod blockchain;
 mod p2p;
+mod retry;
 
 #[tokio::main]
 async fn main() {
@@ -16,7 +17,8 @@ async fn main() {
     info!("Peer Id: {}", p2p::PEER_ID.clone());
 
     let (init_sender, mut init_receiver) = sync::mpsc::unbounded_channel::<()>();
-    let mut swarm = p2p::initialize_swarm(init_sender).await;
+    let (tx_initialized, rx_initialized) = sync::mpsc::unbounded_channel::<()>();
+    let mut swarm = p2p::initialize_swarm(init_sender, tx_initialized, rx_initialized).await;
 
     let mut stdin = BufReader::new(stdin()).lines();
 

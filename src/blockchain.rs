@@ -36,6 +36,10 @@ impl BlockChain {
             && self.blocks[0].id == 0
     }
 
+    pub fn is_empty(&self) -> bool {
+        self.blocks.is_empty()
+    }
+
     pub fn try_add_block(&mut self, new_block: Block) -> BlockAddStatus {
         let latest_block = self.blocks.last().expect("there is at least one block");
         if block::new_block_valid(&new_block, latest_block) {
