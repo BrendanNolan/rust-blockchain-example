@@ -26,14 +26,7 @@ async fn main() {
         select! {
             Some(()) = init_receiver.recv() => {
                 p2p::setup_initial_blockchain(&mut swarm);
-                break;
             },
-            _ = drive_forward(&mut swarm) => {},
-        }
-    }
-
-    loop {
-        select! {
             line = stdin.next_line() => execute_user_command(&line.unwrap().unwrap(), &mut swarm),
             _ = drive_forward(&mut swarm) => {},
         }
