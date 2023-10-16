@@ -14,3 +14,6 @@ Bad Commit:
      src/p2p.rs  | 52 +++++++++++++++++++++++-----------------------------
      2 files changed, 32 insertions(+), 57 deletions(-)
 
+
+Currently blockchain init messages are sent and received but apparently no genesis has happened on
+either side.
