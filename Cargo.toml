@@ -7,6 +7,7 @@ edition = "2021"
 
 [dependencies]
 chrono = "0.4"
+console-subscriber = "0.2.0"
 sha2 = "0.9.8"
 serde = {version = "1.0", features = ["derive"] }
 serde_json = "1.0"

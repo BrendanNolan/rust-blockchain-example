@@ -8,7 +8,8 @@
            "cwd": "${workspaceFolder}",
            "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}",
            "env": {
-               "RUST_LOG": "info"
+               "RUST_LOG": "info",
+               "RUSTFLAGS": "--cfg tokio_unstable"
            },
            "stopAtEntry": true
        },
@@ -19,7 +20,8 @@
            "cwd": "${workspaceFolder}",
            "program": "${workspaceFolder}/target/debug/${workspaceFolderBasename}",
            "env": {
-               "RUST_LOG": "debug"
+               "RUST_LOG": "debug",
+               "RUSTFLAGS": "--cfg tokio_unstable"
            },
            "stopAtEntry": true
        }

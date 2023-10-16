@@ -12,6 +12,8 @@ mod p2p;
 
 #[tokio::main]
 async fn main() {
+    console_subscriber::init();
+
     pretty_env_logger::init();
     info!("Peer Id: {}", p2p::PEER_ID.clone());
 
