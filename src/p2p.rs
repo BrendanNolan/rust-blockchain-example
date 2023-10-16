@@ -13,7 +13,7 @@ use libp2p::{
     tcp::TokioTcpConfig,
     NetworkBehaviour, PeerId, Transport,
 };
-use log::{error, info};
+use log::{debug, error, info};
 use once_cell::sync::Lazy;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -166,9 +166,15 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
     fn inject_event(&mut self, event: MdnsEvent) {
         match event {
             MdnsEvent::Discovered(discovered_addresses) => {
-                let discovered_addresses = discovered_addresses.peekable();
-                for (peer, _addr) in discovered_addresses {
+                let discovered_addresses = discovered_addresses
+                    .map(|(peer, _addr)| peer)
+                    .collect::<Vec<_>>();
+                for &peer in &discovered_addresses {
                     self.floodsub.add_node_to_partial_view(peer);
+                }
+                if discovered_addresses.is_empty() {
+                    debug!("No peers discovered");
+                    return;
                 }
                 if let Some(init_sender) = self.init_sender.take() {
                     init_sender.send(()).expect("can send init signal");

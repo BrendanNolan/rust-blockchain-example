@@ -17,12 +17,21 @@ async fn main() {
 
     let (init_sender, mut init_receiver) = sync::mpsc::unbounded_channel::<()>();
     let mut swarm = p2p::initialize_swarm(init_sender).await;
-    setup_initial_blockchain(&mut swarm);
 
     let mut stdin = BufReader::new(stdin()).lines();
+
     loop {
         select! {
-            Some(()) = init_receiver.recv() => setup_initial_blockchain(&mut swarm),
+            Some(()) = init_receiver.recv() => {
+                setup_initial_blockchain(&mut swarm);
+                break;
+            },
+            _ = drive_forward(&mut swarm) => {},
+        }
+    }
+
+    loop {
+        select! {
             line = stdin.next_line() => execute_user_command(&line.unwrap().unwrap(), &mut swarm),
             _ = drive_forward(&mut swarm) => {},
         }
