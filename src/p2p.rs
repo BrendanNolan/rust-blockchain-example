@@ -104,6 +104,21 @@ pub async fn initialize_swarm(init_sender: sync::mpsc::UnboundedSender<()>) -> S
     swarm
 }
 
+pub fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
+    info!("setting up initial blockchain");
+    let peers = get_peers(swarm);
+    assert!(!peers.is_empty(), "no peers found");
+    info!("Performing genesis");
+    swarm.behaviour_mut().blockchain.genesis();
+    let peer = peers.last().expect("can get peer");
+    info!(
+        "Will ask one of the connected nodes, {}, for its blockchain.",
+        peer.id()
+    );
+    request_chain(swarm, peer.clone());
+    info!("Blockchain requested");
+}
+
 #[derive(Serialize, Deserialize)]
 enum Publication {
     ChainRequest(ChainRequest),

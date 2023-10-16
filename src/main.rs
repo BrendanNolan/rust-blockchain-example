@@ -23,7 +23,7 @@ async fn main() {
     loop {
         select! {
             Some(()) = init_receiver.recv() => {
-                setup_initial_blockchain(&mut swarm);
+                p2p::setup_initial_blockchain(&mut swarm);
                 break;
             },
             _ = drive_forward(&mut swarm) => {},
@@ -53,21 +53,6 @@ fn execute_user_command(line: &str, swarm: &mut Swarm<AppBehaviour>) {
         }
         _ => error!("unknown command"),
     }
-}
-
-fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
-    info!("setting up initial blockchain");
-    let peers = p2p::get_peers(swarm);
-    assert!(!peers.is_empty(), "no peers found");
-    info!("Performing genesis");
-    swarm.behaviour_mut().blockchain.genesis();
-    let peer = peers.last().expect("can get peer");
-    info!(
-        "Will ask one of the connected nodes, {}, for its blockchain.",
-        peer.id()
-    );
-    p2p::request_chain(swarm, peer.clone());
-    info!("Blockchain requested");
 }
 
 async fn drive_forward(swarm: &mut Swarm<AppBehaviour>) {
