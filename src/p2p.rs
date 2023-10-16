@@ -126,7 +126,7 @@ fn try_accept_chain(app_behaviour: &mut AppBehaviour, resp: ChainResponse, sourc
     if resp.receiver != SerializablePeerId(PEER_ID.to_string()) {
         return;
     }
-    info!("Response from {}:", source);
+    info!("Chain response from {}:", source);
     resp.blocks.iter().for_each(|r| info!("{:?}", r));
 
     app_behaviour.blockchain.blocks =
@@ -194,11 +194,13 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
 pub fn get_peers(swarm: &Swarm<AppBehaviour>) -> Vec<SerializablePeerId> {
     info!("Discovered Peers:");
     let nodes = swarm.behaviour().mdns.discovered_nodes();
-    nodes
+    let peers = nodes
         .collect::<HashSet<_>>()
         .iter()
         .map(|p| SerializablePeerId(p.to_string()))
-        .collect()
+        .collect();
+    info!("{:?}", peers);
+    peers
 }
 
 pub fn print_peers(swarm: &Swarm<AppBehaviour>) {

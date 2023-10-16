@@ -1,5 +1,6 @@
 use crate::block::{self, Block};
 use chrono::prelude::*;
+use log::info;
 
 pub struct BlockChain {
     pub blocks: Vec<Block>,
@@ -60,13 +61,17 @@ pub fn choose_longer_valid_chain<'a>(local: &'a [Block], remote: &'a [Block]) ->
 
     if is_local_valid && is_remote_valid {
         if local.len() >= remote.len() {
+            info!("Local chain longer");
             local
         } else {
+            info!("Remote chain longer");
             remote
         }
     } else if is_remote_valid && !is_local_valid {
+        info!("Remote chain longer");
         remote
     } else if !is_remote_valid && is_local_valid {
+        info!("Local chain longer");
         local
     } else {
         panic!("local and remote chains are both invalid");
