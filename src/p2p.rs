@@ -262,7 +262,7 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
                         tokio::spawn(retry::run_retry_loop(
                             rx_initialized,
                             tx_init,
-                            std::time::Duration::from_secs(5),
+                            std::time::Duration::from_millis(250),
                         ));
                     }
                 }
