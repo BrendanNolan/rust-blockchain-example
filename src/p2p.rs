@@ -45,7 +45,7 @@ struct ChainResponse {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct ChainRequest {
-    from_peer_id: SerializablePeerId,
+    requestee: SerializablePeerId,
 }
 
 #[derive(NetworkBehaviour)]
@@ -144,7 +144,7 @@ fn try_accept_chain(app_behaviour: &mut AppBehaviour, resp: ChainResponse, sourc
 }
 
 fn try_send_chain(app_behaviour: &mut AppBehaviour, req: ChainRequest, target: &PeerId) {
-    if !req.from_peer_id.equal(&PEER_ID) {
+    if !req.requestee.equal(&PEER_ID) {
         return;
     }
     info!("sending local chain to {}", target.to_string());
@@ -225,7 +225,7 @@ pub fn print_chain(swarm: &Swarm<AppBehaviour>) {
 }
 
 pub fn request_chain(swarm: &mut Swarm<AppBehaviour>, peer: SerializablePeerId) {
-    let req = ChainRequest { from_peer_id: peer };
+    let req = ChainRequest { requestee: peer };
     let json_req =
         serde_json::to_string(&Publication::ChainRequest(req)).expect("can jsonify request");
     swarm
