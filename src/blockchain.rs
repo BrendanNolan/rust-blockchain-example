@@ -1,5 +1,4 @@
 use crate::block::{self, Block};
-use chrono::prelude::*;
 use log::info;
 
 pub struct BlockChain {
@@ -20,7 +19,7 @@ impl BlockChain {
     pub fn genesis(&mut self) {
         let genesis_block = Block {
             id: 0,
-            timestamp: Utc::now().timestamp(),
+            timestamp: 0,
             previous_hash: String::from("genesis"),
             data: String::from("genesis!"),
             nonce: 2836,

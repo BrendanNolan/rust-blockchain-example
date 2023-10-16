@@ -129,7 +129,7 @@ fn try_accept_chain(app_behaviour: &mut AppBehaviour, resp: ChainResponse, sourc
     info!("Chain response from {}:", source);
     resp.blocks.iter().for_each(|r| info!("{:?}", r));
 
-    if app_behaviour.blockchain.blocks.len() == 1 {
+    if app_behaviour.blockchain.is_genesis_block_only() {
         app_behaviour.blockchain.blocks = resp.blocks;
         return;
     }
