@@ -71,6 +71,6 @@ fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
 }
 
 async fn drive_forward(swarm: &mut Swarm<AppBehaviour>) {
-    let _event = swarm.select_next_some().await;
-    debug!("Drove swarm forward by selecting next event, but did not handle that event.",);
+    let event = swarm.select_next_some().await;
+    debug!("Drove swarm: event {:?}", event);
 }
