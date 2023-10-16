@@ -56,10 +56,12 @@ fn execute_user_command(line: &str, swarm: &mut Swarm<AppBehaviour>) {
 }
 
 fn setup_initial_blockchain(swarm: &mut Swarm<AppBehaviour>) {
+    info!("setting up initial blockchain");
     let peers = p2p::get_peers(swarm);
     assert!(!peers.is_empty(), "no peers found");
+    info!("Performing genesis");
     swarm.behaviour_mut().blockchain.genesis();
-    info!("connected nodes: {}", peers.len());
+    info!("Will ask the last of these connected nodes for its blockchain: {:?}", peers);
     if !peers.is_empty() {
         let last_peer = peers.last().expect("can get last peer");
         p2p::request_chain(swarm, last_peer.clone());
