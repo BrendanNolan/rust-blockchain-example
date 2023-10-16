@@ -70,6 +70,7 @@ impl AppBehaviour {
         };
         behaviour.floodsub.subscribe(CHAIN_TOPIC.clone());
         behaviour.floodsub.subscribe(BLOCK_TOPIC.clone());
+        info!("Subscriptions Made.");
         behaviour
     }
 }
@@ -186,7 +187,10 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
                     return;
                 }
                 if let Some(init_sender) = self.init_sender.take() {
-                    init_sender.send(()).expect("can send init signal");
+                    tokio::spawn(async move {
+                        tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                        init_sender.send(()).expect("can send init signal");
+                    });
                 }
             }
             MdnsEvent::Expired(expired_addresses) => {
