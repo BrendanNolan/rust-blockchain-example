@@ -5,7 +5,7 @@ use super::{
 use crate::retry;
 use libp2p::{
     core::upgrade,
-    floodsub::{Floodsub, FloodsubEvent, Topic},
+    gossipsub::{Gossipsub, GossipsubConfig, GossipsubEvent, IdentTopic, MessageAuthenticity},
     identity,
     mdns::{Mdns, MdnsEvent},
     mplex,
@@ -22,8 +22,8 @@ use tokio::sync;
 
 pub static KEYS: Lazy<identity::Keypair> = Lazy::new(identity::Keypair::generate_ed25519);
 pub static PEER_ID: Lazy<PeerId> = Lazy::new(|| PeerId::from(KEYS.public()));
-pub static CHAIN_TOPIC: Lazy<Topic> = Lazy::new(|| Topic::new("chains"));
-pub static BLOCK_TOPIC: Lazy<Topic> = Lazy::new(|| Topic::new("blocks"));
+pub static CHAIN_TOPIC: Lazy<IdentTopic> = Lazy::new(|| IdentTopic::new("chains"));
+pub static BLOCK_TOPIC: Lazy<IdentTopic> = Lazy::new(|| IdentTopic::new("blocks"));
 
 #[derive(Clone, Debug, Serialize, Deserialize, PartialEq)]
 pub struct SerializablePeerId(String);
@@ -55,7 +55,7 @@ struct ChainRequest {
 
 #[derive(NetworkBehaviour)]
 pub struct AppBehaviour {
-    floodsub: Floodsub,
+    gossipsub: Gossipsub,
     mdns: Mdns,
     #[behaviour(ignore)]
     pub blockchain: BlockChain,
@@ -79,13 +79,17 @@ impl AppBehaviour {
             tx_init: Some(init),
             tx_initialized: Some(tx_initialized),
             rx_initialized: Some(rx_initialized),
-            floodsub: Floodsub::new(*PEER_ID),
+            gossipsub: Gossipsub::new(
+                MessageAuthenticity::Signed(identity::Keypair::clone(&KEYS)),
+                GossipsubConfig::default(),
+            )
+            .unwrap(),
             mdns: Mdns::new(Default::default())
                 .await
                 .expect("can create mdns"),
         };
-        behaviour.floodsub.subscribe(CHAIN_TOPIC.clone());
-        behaviour.floodsub.subscribe(BLOCK_TOPIC.clone());
+        let _ = behaviour.gossipsub.subscribe(&CHAIN_TOPIC);
+        let _ = behaviour.gossipsub.subscribe(&BLOCK_TOPIC);
         info!("Subscriptions Made.");
         behaviour
     }
@@ -150,18 +154,23 @@ enum Publication {
     Block(Block),
 }
 
-impl NetworkBehaviourEventProcess<FloodsubEvent> for AppBehaviour {
-    fn inject_event(&mut self, event: FloodsubEvent) {
-        let FloodsubEvent::Message(msg) = event else {
+impl NetworkBehaviourEventProcess<GossipsubEvent> for AppBehaviour {
+    fn inject_event(&mut self, event: GossipsubEvent) {
+        let GossipsubEvent::Message {
+            propagation_source: _,
+            message_id: _,
+            message,
+        } = event
+        else {
             return;
         };
-        let Ok(publication) = serde_json::from_slice::<Publication>(&msg.data) else {
+        let Ok(publication) = serde_json::from_slice::<Publication>(&message.data) else {
             return;
         };
         match publication {
-            Publication::ChainRequest(req) => try_send_chain(self, req, &msg.source),
+            Publication::ChainRequest(req) => try_send_chain(self, req, &message.source.unwrap()),
             Publication::ChainResponse(resp) => {
-                if try_accept_chain(self, resp, &msg.source)
+                if try_accept_chain(self, resp, &message.source.unwrap())
                     == ChainAcceptance::AcceptedInitialChain
                 {
                     if let Some(tx_initialized) = self.tx_initialized.take() {
@@ -169,7 +178,7 @@ impl NetworkBehaviourEventProcess<FloodsubEvent> for AppBehaviour {
                     }
                 }
             }
-            Publication::Block(block) => try_add_new_block(self, block, &msg.source),
+            Publication::Block(block) => try_add_new_block(self, block, &message.source.unwrap()),
         }
     }
 }
@@ -220,8 +229,8 @@ fn try_send_chain(app_behaviour: &mut AppBehaviour, req: ChainRequest, target: &
         receiver: SerializablePeerId::new(target),
     });
     let json_resp = serde_json::to_string(&response).expect("can jsonify response");
-    app_behaviour
-        .floodsub
+    let _ = app_behaviour
+        .gossipsub
         .publish(CHAIN_TOPIC.clone(), json_resp.as_bytes());
 }
 
@@ -245,8 +254,8 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
                 let discovered_addresses = discovered_addresses
                     .map(|(peer, _addr)| peer)
                     .collect::<Vec<_>>();
-                for &peer in &discovered_addresses {
-                    self.floodsub.add_node_to_partial_view(peer);
+                for peer in &discovered_addresses {
+                    self.gossipsub.add_explicit_peer(peer);
                 }
                 if discovered_addresses.is_empty() {
                     debug!("No peers discovered");
@@ -265,7 +274,7 @@ impl NetworkBehaviourEventProcess<MdnsEvent> for AppBehaviour {
             MdnsEvent::Expired(expired_addresses) => {
                 for (peer, _addr) in expired_addresses {
                     if !self.mdns.has_node(&peer) {
-                        self.floodsub.remove_node_from_partial_view(&peer);
+                        self.gossipsub.remove_explicit_peer(&peer);
                     }
                 }
             }
@@ -301,9 +310,9 @@ pub fn request_chain(swarm: &mut Swarm<AppBehaviour>, peer: SerializablePeerId) 
     let req = ChainRequest { requestee: peer };
     let json_req =
         serde_json::to_string(&Publication::ChainRequest(req)).expect("can jsonify request");
-    swarm
+    let _ = swarm
         .behaviour_mut()
-        .floodsub
+        .gossipsub
         .publish(CHAIN_TOPIC.clone(), json_req.as_bytes());
 }
 
@@ -312,7 +321,7 @@ pub fn broadcast_block(block: Block, swarm: &mut Swarm<AppBehaviour>) {
     let json_block =
         serde_json::to_string(&Publication::Block(block)).expect("can jsonify request");
     info!("broadcasting new block");
-    behaviour
-        .floodsub
+    let _ = behaviour
+        .gossipsub
         .publish(BLOCK_TOPIC.clone(), json_block.as_bytes());
 }
