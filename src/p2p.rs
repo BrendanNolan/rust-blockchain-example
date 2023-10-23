@@ -307,7 +307,7 @@ pub fn request_chain(swarm: &mut Swarm<AppBehaviour>, peer: SerializablePeerId) 
         .publish(CHAIN_TOPIC.clone(), json_req.as_bytes());
 }
 
-pub fn send_block(block: Block, swarm: &mut Swarm<AppBehaviour>) {
+pub fn broadcast_block(block: Block, swarm: &mut Swarm<AppBehaviour>) {
     let behaviour = swarm.behaviour_mut();
     let json_block =
         serde_json::to_string(&Publication::Block(block)).expect("can jsonify request");

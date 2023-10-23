@@ -43,7 +43,7 @@ fn execute_user_command(line: &str, swarm: &mut Swarm<AppBehaviour>) {
                     .behaviour_mut()
                     .blockchain
                     .mine_block_return_mined_clone(data);
-                p2p::send_block(new_block, swarm);
+                p2p::broadcast_block(new_block, swarm);
             }
         }
         _ => error!("unknown command"),
