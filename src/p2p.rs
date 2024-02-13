@@ -68,12 +68,8 @@ pub struct AppBehaviour {
 }
 
 impl AppBehaviour {
-    pub async fn new(
-        blockchain: BlockChain,
-        init: sync::mpsc::UnboundedSender<()>,
-        tx_initialized: sync::mpsc::UnboundedSender<()>,
-        rx_initialized: sync::mpsc::UnboundedReceiver<()>,
-    ) -> Self {
+    pub async fn new(blockchain: BlockChain, init: sync::mpsc::UnboundedSender<()>) -> Self {
+        let (tx_initialized, rx_initialized) = sync::mpsc::unbounded_channel::<()>();
         let mut behaviour = Self {
             blockchain,
             tx_init: Some(init),
@@ -91,11 +87,7 @@ impl AppBehaviour {
     }
 }
 
-pub async fn initialize_swarm(
-    init_sender: sync::mpsc::UnboundedSender<()>,
-    tx_initialized: sync::mpsc::UnboundedSender<()>,
-    rx_initialized: sync::mpsc::UnboundedReceiver<()>,
-) -> Swarm<AppBehaviour> {
+pub async fn initialize_swarm(init_sender: sync::mpsc::UnboundedSender<()>) -> Swarm<AppBehaviour> {
     let auth_keys = Keypair::<X25519Spec>::new()
         .into_authentic(&KEYS)
         .expect("can create auth keys");
@@ -106,13 +98,7 @@ pub async fn initialize_swarm(
         .multiplex(mplex::MplexConfig::new())
         .boxed();
 
-    let behaviour = AppBehaviour::new(
-        BlockChain::new(),
-        init_sender,
-        tx_initialized,
-        rx_initialized,
-    )
-    .await;
+    let behaviour = AppBehaviour::new(BlockChain::new(), init_sender).await;
 
     let mut swarm = SwarmBuilder::new(transp, behaviour, *PEER_ID)
         .executor(Box::new(|fut| {
